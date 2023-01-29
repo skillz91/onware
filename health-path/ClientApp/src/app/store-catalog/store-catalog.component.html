@@ -16,4 +16,12 @@
             </ul>
         </td>
     </ng-container>
+    <ng-container matColumnDef="routes">
+        <th mat-header-cell *matHeaderCellDef>Routes</th>
+        <td mat-cell *matCellDef="let product">
+            <ul>
+                <li *ngFor="let r of product.routes">{{r}}</li>
+            </ul>
+        </td>
+    </ng-container>
 </table>

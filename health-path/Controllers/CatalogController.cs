@@ -40,6 +40,7 @@ public class CatalogController : ControllerBase
         var productRecords = await FetchProductRecords(nhpids);
         var ids = productRecords.Keys;
         var purposes = await FetchProductPurposes(ids);
+        var routes = await FetchProductRoutes(ids);
 
         var products = new List<NaturalProduct>();
         foreach (var productRecord in productRecords.Values) {
@@ -48,7 +49,8 @@ public class CatalogController : ControllerBase
                 productRecord.ProductName,
                 productRecord.CompanyName,
                 productRecord.Active,
-                purposes.GetValueOrDefault(productRecord.Id, ImmutableList<string>.Empty)
+                purposes.GetValueOrDefault(productRecord.Id, ImmutableList<string>.Empty),
+                routes.GetValueOrDefault(productRecord.Id, ImmutableList<string>.Empty)
             ));
         }
 
@@ -103,6 +105,25 @@ public class CatalogController : ControllerBase
         );
 
         return productPurposes.ToImmutableDictionary(e => e.Key, e => e.Value.ToImmutableList());
+    }
+
+    private async Task<ImmutableDictionary<string, ImmutableList<string>>> FetchProductRoutes(IEnumerable<string> ids)
+    {
+        var routes = new ConcurrentDictionary<string, ConcurrentBag<string>>();
+
+        await FetchMany<JsonArray>(
+            ids.Select(id => $"{_lnhpdBaseUrl}/productroute/?lang=en&id={id}"),
+            r => r,
+            rec =>
+            {
+                string key = rec["lnhpd_id"]!.ToString();
+                string value = rec!["route_type_desc"]!.GetValue<string>();
+                ConcurrentBag<string> purposes = routes.GetOrAdd(key, _ => new ConcurrentBag<string>());
+                purposes.Add(value);
+            }
+        );
+
+        return routes.ToImmutableDictionary(e => e.Key, e => e.Value.ToImmutableList());
     }
 
     private async Task FetchMany<T>(IEnumerable<string> inputUrls, Func<T?, JsonArray?> finder, Action<JsonObject> processor) {

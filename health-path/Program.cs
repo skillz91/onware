@@ -1,4 +1,6 @@
+using System.Data;
 using Microsoft.Extensions.Configuration;
+using Dapper;
 
 namespace health_path;
 
@@ -36,6 +38,19 @@ class Program
 
         app.MapFallbackToFile("index.html");
 
+        RunMigration(app.Services);
+
         app.Run();
+    }
+
+    private static void RunMigration(IServiceProvider services)
+    {
+        using var scope = services.CreateScope();
+        // run migration to normalize emails in database. should be run once and deleted in next release
+        var connection = scope.ServiceProvider.GetRequiredService<IDbConnection>();
+        connection.Execute(@"
+update NewsletterSubscription
+set Email = concat(replace(substring(Email, 1, charindex('@', Email)-1), '.', ''), substring(Email, charindex('@', Email), len(Email)))
+        ");
     }
 }

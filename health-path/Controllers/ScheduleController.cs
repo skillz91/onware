@@ -23,21 +23,31 @@ public class ScheduleController : ControllerBase
     {
         var dbResults = ReadData();
 
-        var preparedResults = dbResults.Select((t) => {
-            t.Item1.Recurrences.Add(t.Item2);
-            return t.Item1;
-        });
-
-        return Ok(preparedResults);
+        return Ok(dbResults);
     }
 
-    private IEnumerable<(ScheduleEvent, ScheduleEventRecurrence)> ReadData() {
+    private IEnumerable<ScheduleEvent> ReadData() {
         var sql = @"
             SELECT e.*, r.*
             FROM Event e
             JOIN EventRecurrence r ON e.Id = r.EventId
             ORDER BY e.Id, r.DayOfWeek, r.StartTime, r.EndTime
         ";
-        return _connection.Query<ScheduleEvent, ScheduleEventRecurrence, (ScheduleEvent, ScheduleEventRecurrence)>(sql, (e, r) => (e, r));
+        var lookup = new Dictionary<Guid, ScheduleEvent>();
+        var result = _connection.Query<ScheduleEvent, ScheduleEventRecurrence, ScheduleEvent>(sql, (e, r) => {
+            ScheduleEvent? res;
+            if (!lookup.TryGetValue(e.Id, out res)) 
+            {
+                res = e;
+                lookup.Add(e.Id, e);
+            }
+            if (res.Recurrences == null) 
+            {
+                res.Recurrences = new List<ScheduleEventRecurrence>();
+            }
+            res.Recurrences.Add(r);
+            return res;
+        });
+        return result.Distinct();
     }
 }
